@@ -4,15 +4,17 @@ from torchvision.models import resnet18
 
 
 class ResBlock(nn.Module):
+
     def __init__(self, m):
         super(ResBlock, self).__init__()
         self.m = m
 
     def forward(self, x):
-        return self.m(x)+x
+        return self.m(x) + x
 
 
 class ConcatBlock(nn.Module):
+
     def __init__(self, m):
         super(ConcatBlock, self).__init__()
         self.m = m
@@ -31,7 +33,7 @@ def _init_weights(model):
                 nn.init.constant_(m.bias, 0)
         elif isinstance(
                 m,
-                (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm, nn.LayerNorm)):
+            (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm, nn.LayerNorm)):
             if m.weight is not None:
                 nn.init.constant_(m.weight, 1)
             if m.bias is not None:
@@ -42,32 +44,34 @@ def _init_weights(model):
 
 
 def _cbr5x5(in_channels, out_channels):
-    return [nn.Conv2d(in_channels, out_channels, kernel_size=(5, 5), padding=2),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),]
+    return [
+        nn.Conv2d(in_channels, out_channels, kernel_size=(5, 5), padding=2),
+        nn.BatchNorm2d(out_channels),
+        nn.ReLU(inplace=True),
+    ]
 
 
 def _cb3x3(channels):
-    return [nn.Conv2d(channels, channels, kernel_size=(5, 5), padding=2),
-            nn.BatchNorm2d(channels),]
+    return [
+        nn.Conv2d(channels, channels, kernel_size=(5, 5), padding=2),
+        nn.BatchNorm2d(channels),
+    ]
 
 
 def mcnn(num_classes=10, init_weights=True, **kwargs):
     widths = [16, 64, 128]
 
     def blocks(inchannels, outchannels):
-        return [*_cbr5x5(inchannels, outchannels),
-                *_cb3x3(outchannels),
-                nn.ReLU(inplace=True),
-                *_cb3x3(outchannels),
-                nn.ReLU(inplace=True)]
+        return [
+            *_cbr5x5(inchannels, outchannels), *_cb3x3(outchannels),
+            nn.ReLU(inplace=True), *_cb3x3(outchannels),
+            nn.ReLU(inplace=True)
+        ]
 
     model = nn.Sequential(*[
         *blocks(1, widths[0]),
-        nn.MaxPool2d(kernel_size=3, stride=2),
-        *blocks(widths[0], widths[1]),
-        nn.MaxPool2d(kernel_size=3, stride=2),
-        *blocks(widths[1], widths[2]),
+        nn.MaxPool2d(kernel_size=3, stride=2), *blocks(widths[0], widths[1]),
+        nn.MaxPool2d(kernel_size=3, stride=2), *blocks(widths[1], widths[2]),
         nn.AdaptiveAvgPool2d((1, 1)),
         nn.Flatten(),
         nn.Linear(widths[2], num_classes)
@@ -81,17 +85,18 @@ def resmcnn(num_classes=10, init_weights=True, **kwargs):
     widths = [16, 64, 128]
 
     def blocks(inchannels, outchannels):
-        return [*_cbr5x5(inchannels, outchannels),
-                ResBlock(nn.Sequential(*_cb3x3(outchannels))),
-                nn.ReLU(inplace=True),
-                ResBlock(nn.Sequential(*_cb3x3(outchannels))),
-                nn.ReLU(inplace=True)]
+        return [
+            *_cbr5x5(inchannels, outchannels),
+            ResBlock(nn.Sequential(*_cb3x3(outchannels))),
+            nn.ReLU(inplace=True),
+            ResBlock(nn.Sequential(*_cb3x3(outchannels))),
+            nn.ReLU(inplace=True)
+        ]
+
     model = nn.Sequential(*[
         *blocks(1, widths[0]),
-        nn.MaxPool2d(kernel_size=3, stride=2),
-        *blocks(widths[0], widths[1]),
-        nn.MaxPool2d(kernel_size=3, stride=2),
-        *blocks(widths[1], widths[2]),
+        nn.MaxPool2d(kernel_size=3, stride=2), *blocks(widths[0], widths[1]),
+        nn.MaxPool2d(kernel_size=3, stride=2), *blocks(widths[1], widths[2]),
         nn.AdaptiveAvgPool2d((1, 1)),
         nn.Flatten(),
         nn.Linear(widths[2], num_classes)
@@ -102,6 +107,7 @@ def resmcnn(num_classes=10, init_weights=True, **kwargs):
 
 
 def main():
+
     def print_try(model_func):
         net = model_func()
         print(model_func.__name__,
