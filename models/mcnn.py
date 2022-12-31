@@ -58,7 +58,7 @@ def _cb3x3(channels):
     ]
 
 
-def mcnn(num_classes=10, init_weights=True, **kwargs):
+def mcnn(num_classes=10, channels=1, init_weights=True, **kwargs):
     widths = [16, 64, 128]
 
     def blocks(inchannels, outchannels):
@@ -69,7 +69,7 @@ def mcnn(num_classes=10, init_weights=True, **kwargs):
         ]
 
     model = nn.Sequential(*[
-        *blocks(1, widths[0]),
+        *blocks(channels, widths[0]),
         nn.MaxPool2d(kernel_size=3, stride=2), *blocks(widths[0], widths[1]),
         nn.MaxPool2d(kernel_size=3, stride=2), *blocks(widths[1], widths[2]),
         nn.AdaptiveAvgPool2d((1, 1)),
@@ -81,7 +81,7 @@ def mcnn(num_classes=10, init_weights=True, **kwargs):
     return model
 
 
-def resmcnn(num_classes=10, init_weights=True, **kwargs):
+def resmcnn(num_classes=10, channels=1, init_weights=True, **kwargs):
     widths = [16, 64, 128]
 
     def blocks(inchannels, outchannels):
@@ -94,7 +94,7 @@ def resmcnn(num_classes=10, init_weights=True, **kwargs):
         ]
 
     model = nn.Sequential(*[
-        *blocks(1, widths[0]),
+        *blocks(channels, widths[0]),
         nn.MaxPool2d(kernel_size=3, stride=2), *blocks(widths[0], widths[1]),
         nn.MaxPool2d(kernel_size=3, stride=2), *blocks(widths[1], widths[2]),
         nn.AdaptiveAvgPool2d((1, 1)),

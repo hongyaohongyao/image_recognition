@@ -12,7 +12,8 @@ from torch.optim.lr_scheduler import MultiStepLR, CosineAnnealingLR
 from torch.utils import data
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
-from torchvision.datasets import mnist
+from torchvision import datasets
+
 from tqdm import tqdm
 
 import models  # our model
@@ -24,8 +25,7 @@ def get_lowcase_callable_dict(model_dict):
     return {
         name: v
         for name, v in model_dict.__dict__.items() if name.islower()
-                                                      and not name.startswith("__") and callable(
-            model_dict.__dict__[name])
+        and not name.startswith("__") and callable(model_dict.__dict__[name])
     }
 
 
@@ -36,22 +36,25 @@ model_domain = {
 
 parser = argparse.ArgumentParser(description='PyTorch Image Training')
 parser.add_argument('--name', default='mini_net_sgd', help='task name')
-parser.add_argument('--ds', '--dataset', default='MNIST', help='mnist dataset name')
+parser.add_argument('--ds',
+                    '--dataset',
+                    default='MNIST',
+                    help='mnist dataset name')
 parser.add_argument('--gpu', default="", type=str, help='GPU id to use.')
-parser.add_argument('--grad-hist',
-                    action='store_true',
-                    help='milestones')
+parser.add_argument('--grad-hist', action='store_true', help='milestones')
 parser.add_argument('--data-root',
                     default="./datasets",
                     type=str,
                     help='GPU id to use.')
-parser.add_argument('-a',
-                    '--arch',
-                    default='mcnn',
-                    help='model architecture')
+parser.add_argument('-a', '--arch', default='mcnn', help='model architecture')
 parser.add_argument('--domain',
                     default='base',
                     help='model domain: ' + '|'.join(model_domain.keys()))
+parser.add_argument('-c',
+                    '--channels',
+                    default=1,
+                    type=int,
+                    help='channels of input')
 parser.add_argument('--num-classes',
                     default=10,
                     type=int,
@@ -62,8 +65,8 @@ parser.add_argument(
     default=256,
     type=int,
     help='mini-batch size (mini_net_sgd: 128), this is the total '
-         'batch size of all GPUs on the current node when '
-         'using Data Parallel or Distributed Data Parallel')
+    'batch size of all GPUs on the current node when '
+    'using Data Parallel or Distributed Data Parallel')
 parser.add_argument('-j',
                     '--workers',
                     default=1,
@@ -112,10 +115,7 @@ parser.add_argument('--wd',
                     type=float,
                     help='weight decay (mini_net_sgd: 5e-4)',
                     dest='weight_decay')
-parser.add_argument('--size',
-                    type=int,
-                    default=28,
-                    help='milestones')
+parser.add_argument('--size', type=int, default=28, help='milestones')
 parser.add_argument('-m',
                     '--milestones',
                     type=int,
@@ -132,10 +132,7 @@ parser.add_argument('--sche-gamma',
                     default=0.1,
                     type=float,
                     help='gamme of scheduler')
-parser.add_argument('--dropout',
-                    default=0.0,
-                    type=float,
-                    help='dropout rate')
+parser.add_argument('--dropout', default=0.0, type=float, help='dropout rate')
 parser.add_argument('--erase-aug',
                     action='store_true',
                     help='random erase augmentation')
@@ -193,8 +190,7 @@ def train():
         transforms.RandomAffine(0, (0.1, 0.1)),
         transforms.RandomRotation((-10, 10)),
         transforms.ToTensor(),
-        transforms.Normalize((0.5,),
-                             (0.5,)),
+        transforms.Normalize((0.5, ), (0.5, )),
     ]
     if args.erase_aug:
         trans_list.append(transforms.RandomErasing())
@@ -203,24 +199,23 @@ def train():
     trans_test = transforms.Compose([
         transforms.Resize(args.size),
         transforms.ToTensor(),
-        transforms.Normalize((0.5,),
-                             (0.5,)),
+        transforms.Normalize((0.5, ), (0.5, )),
     ])
 
-    train_set = mnist.__dict__[args.ds](root=args.data_root,
-                                        train=True,
-                                        download=True,
-                                        transform=trans_train)
+    train_set = datasets.__dict__[args.ds](root=args.data_root,
+                                           train=True,
+                                           download=True,
+                                           transform=trans_train)
     train_loader = data.DataLoader(train_set,
                                    batch_size=args.batch_size,
                                    num_workers=args.workers,
                                    pin_memory=True,
                                    shuffle=True)
 
-    test_set = mnist.__dict__[args.ds](root=args.data_root,
-                                       train=False,
-                                       download=True,
-                                       transform=trans_test)
+    test_set = datasets.__dict__[args.ds](root=args.data_root,
+                                          train=False,
+                                          download=True,
+                                          transform=trans_test)
     test_loader = data.DataLoader(test_set,
                                   batch_size=args.batch_size,
                                   num_workers=args.workers,
@@ -231,7 +226,9 @@ def train():
         args.arch, args.num_classes))
     try:
         model = model_domain[args.domain][args.arch](
-            num_classes=args.num_classes, dropout=args.dropout)
+            num_classes=args.num_classes,
+            channels=args.channels,
+            dropout=args.dropout)
     except KeyError:
         logger.error(
             f"model domain: {args.domain} include {'|'.join(model_domain[args.domain].keys())}"
@@ -326,8 +323,12 @@ def train():
         writer.add_scalar('Train/acc', acc / batch_num, epoch)
         if args.grad_hist:
             for name, param in model.named_parameters():
-                writer.add_histogram(tag=name + '_grad', values=param.grad, global_step=epoch)
-                writer.add_histogram(tag=name + '_data', values=param.data, global_step=epoch)
+                writer.add_histogram(tag=name + '_grad',
+                                     values=param.grad,
+                                     global_step=epoch)
+                writer.add_histogram(tag=name + '_data',
+                                     values=param.data,
+                                     global_step=epoch)
         logger.info('Train/loss %.5f' % (epoch_loss / batch_num))
         logger.info('Train/acc %.5f' % (acc / batch_num))
 
