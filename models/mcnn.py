@@ -43,35 +43,44 @@ def _init_weights(model):
             nn.init.constant_(m.bias, 0)
 
 
-def _cbr5x5(in_channels, out_channels):
+def downsample(in_channels, out_channels):
     return [
-        nn.Conv2d(in_channels, out_channels, kernel_size=(5, 5), padding=2),
+        nn.Conv2d(in_channels, out_channels, kernel_size=(3, 3), stride=2),
         nn.BatchNorm2d(out_channels),
         nn.ReLU(inplace=True),
     ]
 
 
-def _cb3x3(channels):
+def conv_bn_relu(in_channels, out_channels):
     return [
-        nn.Conv2d(channels, channels, kernel_size=(5, 5), padding=2),
+        nn.Conv2d(in_channels, out_channels, kernel_size=(3, 3), padding=1),
+        nn.BatchNorm2d(out_channels),
+        nn.ReLU(inplace=True),
+    ]
+
+
+def conv_bn(channels):
+    return [
+        nn.Conv2d(channels, channels, kernel_size=(3, 3), padding=1),
         nn.BatchNorm2d(channels),
     ]
 
 
 def mcnn(num_classes=10, channels=1, init_weights=True, **kwargs):
-    widths = [16, 64, 128]
+    widths = [64, 128, 256]
 
-    def blocks(inchannels, outchannels):
+    def blocks(channels):
         return [
-            *_cbr5x5(inchannels, outchannels), *_cb3x3(outchannels),
-            nn.ReLU(inplace=True), *_cb3x3(outchannels),
-            nn.ReLU(inplace=True)
+            *conv_bn(channels),
+            nn.ReLU(inplace=True),
+            *conv_bn(channels),
+            nn.ReLU(inplace=True),
         ]
 
     model = nn.Sequential(*[
-        *blocks(channels, widths[0]),
-        nn.MaxPool2d(kernel_size=3, stride=2), *blocks(widths[0], widths[1]),
-        nn.MaxPool2d(kernel_size=3, stride=2), *blocks(widths[1], widths[2]),
+        *conv_bn_relu(channels, widths[0]), *blocks(widths[0]),
+        *downsample(widths[0], widths[1]), *blocks(widths[1]),
+        *downsample(widths[1], widths[2]), *blocks(widths[2]),
         nn.AdaptiveAvgPool2d((1, 1)),
         nn.Flatten(),
         nn.Linear(widths[2], num_classes)
@@ -82,21 +91,20 @@ def mcnn(num_classes=10, channels=1, init_weights=True, **kwargs):
 
 
 def resmcnn(num_classes=10, channels=1, init_weights=True, **kwargs):
-    widths = [16, 64, 128]
+    widths = [64, 128, 256]
 
-    def blocks(inchannels, outchannels):
+    def blocks(channels):
         return [
-            *_cbr5x5(inchannels, outchannels),
-            ResBlock(nn.Sequential(*_cb3x3(outchannels))),
+            ResBlock(nn.Sequential(*conv_bn(channels))),
             nn.ReLU(inplace=True),
-            ResBlock(nn.Sequential(*_cb3x3(outchannels))),
-            nn.ReLU(inplace=True)
+            ResBlock(nn.Sequential(*conv_bn(channels))),
+            nn.ReLU(inplace=True),
         ]
 
     model = nn.Sequential(*[
-        *blocks(channels, widths[0]),
-        nn.MaxPool2d(kernel_size=3, stride=2), *blocks(widths[0], widths[1]),
-        nn.MaxPool2d(kernel_size=3, stride=2), *blocks(widths[1], widths[2]),
+        *conv_bn_relu(channels, widths[0]), *blocks(widths[0]),
+        *downsample(widths[0], widths[1]), *blocks(widths[1]),
+        *downsample(widths[1], widths[2]), *blocks(widths[2]),
         nn.AdaptiveAvgPool2d((1, 1)),
         nn.Flatten(),
         nn.Linear(widths[2], num_classes)
