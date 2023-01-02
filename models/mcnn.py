@@ -66,21 +66,26 @@ def conv_bn(channels):
     ]
 
 
-def mcnn(num_classes=10, channels=1, init_weights=True, **kwargs):
+def mcnn(num_classes=10,
+         channels=1,
+         blocks_num=None,
+         init_weights=True,
+         **kwargs):
     widths = [64, 128, 256]
 
-    def blocks(channels):
-        return [
-            *conv_bn(channels),
-            nn.ReLU(inplace=True),
-            *conv_bn(channels),
-            nn.ReLU(inplace=True),
-        ]
+    def blocks(channels, block_num=2):
+        res = []
+        for _ in range(block_num):
+            res.extend([
+                ResBlock(nn.Sequential(*conv_bn(channels))),
+                nn.ReLU(inplace=True)
+            ])
+        return res
 
     model = nn.Sequential(*[
-        *conv_bn_relu(channels, widths[0]), *blocks(widths[0]),
-        *downsample(widths[0], widths[1]), *blocks(widths[1]),
-        *downsample(widths[1], widths[2]), *blocks(widths[2]),
+        *conv_bn_relu(channels, widths[0]), *blocks(widths[0], blocks_num[0]),
+        *downsample(widths[0], widths[1]), *blocks(widths[1], blocks_num[1]),
+        *downsample(widths[1], widths[2]), *blocks(widths[2], blocks_num[2]),
         nn.AdaptiveAvgPool2d((1, 1)),
         nn.Flatten(),
         nn.Linear(widths[2], num_classes)
@@ -90,21 +95,26 @@ def mcnn(num_classes=10, channels=1, init_weights=True, **kwargs):
     return model
 
 
-def resmcnn(num_classes=10, channels=1, init_weights=True, **kwargs):
+def resmcnn(num_classes=10,
+            channels=1,
+            blocks_num=None,
+            init_weights=True,
+            **kwargs):
     widths = [64, 128, 256]
 
-    def blocks(channels):
-        return [
-            ResBlock(nn.Sequential(*conv_bn(channels))),
-            nn.ReLU(inplace=True),
-            ResBlock(nn.Sequential(*conv_bn(channels))),
-            nn.ReLU(inplace=True),
-        ]
+    def blocks(channels, block_num=2):
+        res = []
+        for _ in range(block_num):
+            res.extend([
+                ResBlock(nn.Sequential(*conv_bn(channels))),
+                nn.ReLU(inplace=True)
+            ])
+        return res
 
     model = nn.Sequential(*[
-        *conv_bn_relu(channels, widths[0]), *blocks(widths[0]),
-        *downsample(widths[0], widths[1]), *blocks(widths[1]),
-        *downsample(widths[1], widths[2]), *blocks(widths[2]),
+        *conv_bn_relu(channels, widths[0]), *blocks(widths[0], blocks_num[0]),
+        *downsample(widths[0], widths[1]), *blocks(widths[1], blocks_num[1]),
+        *downsample(widths[1], widths[2]), *blocks(widths[2], blocks_num[2]),
         nn.AdaptiveAvgPool2d((1, 1)),
         nn.Flatten(),
         nn.Linear(widths[2], num_classes)
@@ -112,6 +122,30 @@ def resmcnn(num_classes=10, channels=1, init_weights=True, **kwargs):
     if init_weights:
         _init_weights(model)
     return model
+
+
+def mcnn10(**kwargs):
+    return mcnn(blocks_num=[2, 2, 2], **kwargs)
+
+
+def mcnn16(**kwargs):
+    return mcnn(blocks_num=[4, 4, 4], **kwargs)
+
+
+def mcnn28(**kwargs):
+    return mcnn(blocks_num=[8, 8, 8], **kwargs)
+
+
+def resmcnn10(**kwargs):
+    return resmcnn(blocks_num=[2, 2, 2], **kwargs)
+
+
+def resmcnn16(**kwargs):
+    return resmcnn(blocks_num=[4, 4, 4], **kwargs)
+
+
+def resmcnn28(**kwargs):
+    return resmcnn(blocks_num=[8, 8, 8], **kwargs)
 
 
 def main():
@@ -122,8 +156,12 @@ def main():
               net(torch.zeros(32, 1, 28, 28)).shape,
               sum(p.numel() for p in net.parameters()))
 
-    print_try(mcnn)
-    print_try(resmcnn)
+    print_try(mcnn10)
+    print_try(resmcnn10)
+    print_try(mcnn16)
+    print_try(resmcnn16)
+    print_try(mcnn28)
+    print_try(resmcnn28)
 
 
 if __name__ == '__main__':
