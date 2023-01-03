@@ -45,7 +45,7 @@ parser.add_argument('--grad-hist', action='store_true', help='milestones')
 parser.add_argument('--data-root',
                     default="./datasets",
                     type=str,
-                    help='GPU id to use.')
+                    help='dataset root')
 parser.add_argument('-a', '--arch', default='mcnn', help='model architecture')
 parser.add_argument('--domain',
                     default='base',
