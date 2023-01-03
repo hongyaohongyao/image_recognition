@@ -115,7 +115,6 @@ parser.add_argument('--wd',
                     type=float,
                     help='weight decay (mini_net_sgd: 5e-4)',
                     dest='weight_decay')
-parser.add_argument('--size', type=int, default=28, help='milestones')
 parser.add_argument('-m',
                     '--milestones',
                     type=int,
@@ -197,7 +196,6 @@ def train():
     trans_train = transforms.Compose(trans_list)
 
     trans_test = transforms.Compose([
-        transforms.Resize(args.size),
         transforms.ToTensor(),
         transforms.Normalize((0.5, ), (0.5, )),
     ])

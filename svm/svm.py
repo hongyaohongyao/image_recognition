@@ -1,11 +1,15 @@
-import kernel as _KERNEL
+try:
+    from . import kernel as _KERNEL
+except ImportError:
+    import kernel as _KERNEL
 
 import numpy as np
 import random
 
+
 class SVM(object):
 
-    def __init__(self, C=1, max_iter=40, kernel='rbf', **kwargs):
+    def __init__(self, C=1, max_iter=50, kernel='rbf', **kwargs):
         super(SVM, self).__init__()
         self.C = C
         self.max_iter = max_iter
@@ -18,8 +22,7 @@ class SVM(object):
         self.kernel_args = kwargs
         self.kernel = kernel
 
-
-    def fit(self, X, y):
+    def fit(self, X, y, verbose=False):
         assert len(self.alphas) == 0, "SVM Model has been fitted"
         X, y = np.array(X, dtype=float), np.array(y, dtype=int)
 
@@ -48,6 +51,8 @@ class SVM(object):
             y = np.where(y <= 0, -1, 1)  # 标签转换为-1和1
             for i in range(self.class_num):
                 self._fit(X, y[:, i], gram_K)
+                if verbose:
+                    print(f"trained class{i}")
 
         return self
 
