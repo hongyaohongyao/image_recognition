@@ -11,21 +11,43 @@ class SVM(object):
         self.C = C
         self.max_iter = max_iter
         self.alphas = []
+        self.support_vec = []
         self.w = []
         self.b = []
-        self.kernel = getattr(_KERNEL, kernel)(*kwargs)
+        self.class_num = 0
+        self.linear_kernel = kernel == 'linear'
+        self.kernel_args = kwargs
+        self.kernel = kernel
 
     def fit(self, X, y):
-        assert len(self.w) == 0, "SVM Model has been fitted"
+        assert len(self.alphas) == 0, "SVM Model has been fitted"
         X, y = np.array(X, dtype=float), np.array(y, dtype=int)
 
-        class_num = np.max(y) + 1  # 最大的类
-        y = np.eye(class_num)[y]
+        self.class_num = np.max(y) + 1  # 最大的类
+        assert self.class_num >= 2, 'class number should be larger than 2'
+        # create kernel
+        if "gamma" in self.kernel_args:
+            gamma = self.kernel_args['gamma']
+            if gamma == "scale":
+                gamma = 1 / (X.shape[1] * X.var())
+            elif gamma == 'auto':
+                gamma = 1 / X.shape[1]
+            self.kernel_args['gamma'] = gamma
 
-        y = np.where(y <= 0, -1, 1)  # 标签转换为-1和1
+        self.kernel = getattr(_KERNEL, self.kernel)(**self.kernel_args)
         gram_K = self._kernel_matrix(X)
-        for i in range(class_num):
-            self._fit(X, y[:, i], gram_K)
+
+        if self.class_num == 2:
+            y = np.where(y <= 0, -1, 1)  # 标签转换为-1和1
+            self._fit(X, y, gram_K)
+        else:
+            """
+            multi class
+            """
+            y = np.eye(self.class_num)[y]
+            y = np.where(y <= 0, -1, 1)  # 标签转换为-1和1
+            for i in range(self.class_num):
+                self._fit(X, y[:, i], gram_K)
 
         return self
 
@@ -52,9 +74,9 @@ class SVM(object):
         def g(i):
             "SVM分类器函数 y = w^Tx + b"
             # Kernel function vector.
-            ks = gram_K[:, i]
+            ks = gram_K[:, i]  #N1,N2 -> N1
 
-            # Predictive value.
+            # Predictive value. w
             wx = np.inner(alphas * y, ks)
             gx = wx + b
             return gx
@@ -96,7 +118,6 @@ class SVM(object):
                 a_i_new = a_i_old + y_i * y_j * (a_j_old - a_j_new)
 
                 if abs(a_j_new - a_j_old) < 0.00001:
-                    # print('WARNING   alpha_j not moving enough')
                     continue
 
                 alphas[i], alphas[j] = a_i_new, a_j_new
@@ -127,22 +148,47 @@ class SVM(object):
                 it = 0
             # print('iteration number: {}'.format(it))
 
-        self.alphas.append(alphas)
+        support_vec_idx = alphas > 1e-3
+        alphas = alphas[support_vec_idx]
+        X = X[support_vec_idx]
+        y = y[support_vec_idx]
 
-        yx = y.reshape(1, -1).T * np.array([1, 1]) * X
-        self.w.append(np.dot(yx.T, alphas))
+        self.alphas.append(alphas)
+        self.support_vec.append(X)
+        if self.linear_kernel:
+            self.w.append(np.dot(y * alphas, X))
+        else:
+            self.w.append(y * alphas)
         self.b.append(b)
 
     def _kernel_matrix(self, X):
-        n_samples, n_features = X.shape
-        K = np.zeros((n_samples, n_samples))
+        N, _ = X.shape
+        K = np.zeros((N, N))
         for i, x_i in enumerate(X):
             for j, x_j in enumerate(X):
                 K[i, j] = self.kernel(x_i, x_j)
         return K
 
     def predict(self, X):
-        pass
+        result = []
+        N, _ = X.shape
+        for i in range(len(self.alphas)):
+            w = self.w[i]
+            b = self.b[i]
+            if self.linear_kernel:
+                result.append(np.inner(w, X) + b)
+            else:
+                support_vec = self.support_vec[i]
+                Nsv, _ = support_vec.shape
+                K = np.zeros((Nsv, N))
+                for i_sv, sv in enumerate(support_vec):
+                    for j, x in enumerate(X):
+                        K[i_sv, j] = self.kernel(sv, x)
+                result.append(np.dot(w, K) + b)
+        if len(result) == 1:
+            return np.where(result[0] <= 0, 0, 1)
+        else:
+            return np.argmax(np.stack(result).T, axis=-1)
 
 
 if '__main__' == __name__:

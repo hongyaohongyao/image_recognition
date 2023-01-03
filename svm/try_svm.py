@@ -1,5 +1,5 @@
 import numpy as np
-from sklearn import datasets
+
 from svm import SVM
 import matplotlib.pyplot as plt
 
@@ -13,8 +13,6 @@ def plot_svc_decision_boundary(model, xmin, xmax, sv=True):
 
 if __name__ == "__main__":
 
-    iris = datasets.load_iris()
-
     np.random.seed(12)
     num_observations = 50
 
@@ -24,6 +22,7 @@ if __name__ == "__main__":
                                        num_observations)
 
     X = np.vstack((x1, x2)).astype(np.float32)
+    X = (X - X.mean()) / X.std()
     y = np.hstack((np.zeros(num_observations), np.ones(num_observations)))
 
     model = SVM(kernel='linear', C=1, max_iter=500)
@@ -33,7 +32,7 @@ if __name__ == "__main__":
     ax = fig.add_subplot(111)
     ax.scatter(X[:, 0], X[:, 1], c=y, alpha=.4)
 
-    w, b, alphas = model.w[0], model.b[0], model.alphas[0]
+    w, b, sv = model.w[0], model.b[0], model.support_vec[0]
     x1, _ = max(X, key=lambda x: x[0])
     x2, _ = min(X, key=lambda x: x[0])
     a1, a2 = w
@@ -43,14 +42,13 @@ if __name__ == "__main__":
     ax.plot([x1, x2], [y1 - margin, y2 - margin], 'k--')
     ax.plot([x1, x2], [y1 + margin, y2 + margin], 'k--')
 
-    for i, alpha in enumerate(alphas):
-        if abs(alpha) > 1e-3:
-            x, y = X[i]
-            ax.scatter([x], [y],
-                       s=150,
-                       c='none',
-                       alpha=0.7,
-                       linewidth=1.5,
-                       edgecolor='#AB3319')
+    for i, s in enumerate(sv):
+        x, y = s
+        ax.scatter([x], [y],
+                   s=150,
+                   c='none',
+                   alpha=0.7,
+                   linewidth=1.5,
+                   edgecolor='#AB3319')
 
     plt.savefig("svm.png")
