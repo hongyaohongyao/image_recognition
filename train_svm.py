@@ -39,11 +39,11 @@ parser.add_argument('-j',
                     metavar='N',
                     help='number of data loading workers (mini_net_sgd: 4)')
 parser.add_argument('-C', default=1, type=float, help='C')
-parser.add_argument('--sample-rate',
+parser.add_argument('--sample-num',
                     '--sr',
-                    default=0.5,
-                    type=float,
-                    help='sample train data')
+                    default=2000,
+                    type=int,
+                    help='sample data')
 parser.add_argument('-k',
                     '--kernel',
                     default="rbf",
@@ -89,8 +89,7 @@ def train():
                                            download=True,
                                            transform=trans_train)
     train_loader = data.DataLoader(train_set,
-                                   batch_size=int(
-                                       len(train_set) * args.sample_rate),
+                                   batch_size=args.sample_num,
                                    num_workers=args.workers,
                                    pin_memory=True,
                                    shuffle=True)

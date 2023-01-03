@@ -1,6 +1,6 @@
 import numpy as np
 
-from svm import SVM
+from platt_svm import SVM
 import matplotlib.pyplot as plt
 
 

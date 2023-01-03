@@ -1,8 +1,8 @@
 import numpy as np
 from sklearn.datasets import make_moons
-from svm import SVM
+from platt_svm import SVM
 import matplotlib.pyplot as plt
-
+from sklearn.svm import SVC
 
 def plot_dataset(X, y, axes):
     plt.plot(X[:, 0][y == 0], X[:, 1][y == 0], "bs")
@@ -24,10 +24,16 @@ def plot_predictions(clf, axes):
 
 if __name__ == "__main__":
 
-    X, y = make_moons(n_samples=100, noise=0.15, random_state=42)
+    """
+    start calc 2023-01-03 15:59:28.469280
+    end calc 2023-01-03 15:59:30.063595
+    """
+
+    X, y = make_moons(n_samples=1000, noise=0.15, random_state=42)
 
     # model = SVM(kernel='poly', C=5, max_iter=500, coef0=1)
-    model = SVM(kernel='rbf', C=5, max_iter=500, gamma='scale')
+    model = SVM(kernel='rbf', C=5, max_iter=40, gamma='scale')
+    # model = SVC(kernel='rbf', C=5)
     model.fit(X, y)
 
     plot_dataset(X, y, [-1.5, 2.5, -1, 1.5])

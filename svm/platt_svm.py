@@ -28,11 +28,106 @@ def g(i, gram_K, alphas, y, b):
     return gx
 
 
+@jit(nopython=True)
+def select_j(i, N, C, alphas, errors):
+    ''' 通过最大化步长的方式来获取第二个alpha值的索引.
+        '''
+    valid_indices = [i for i, a in enumerate(alphas) if 0 < a < C]
+
+    if len(valid_indices) > 1:
+        j = -1
+        max_delta = 0
+        for k in valid_indices:
+            if k == i:
+                continue
+            delta = abs(errors[i] - errors[j])
+            if delta > max_delta:
+                j = k
+                max_delta = delta
+    else:
+        j = i
+        while j == i:
+            j = int(random.uniform(0, N))
+    return j
+
+
+@jit(nopython=True)
+def get_error(i, gram_K, y, alphas, b):
+    ''' 
+    获取第i个数据对应的误差.
+    '''
+    return g(i, gram_K, alphas, y, b) - y[i]
+
+
+@jit(nopython=True)
+def examine_example(i, alphas, gram_K, errors, X, y, tolerance, C, N, b):
+    ''' 给定第一个alpha，检测对应alpha是否符合KKT条件并选取第二个alpha进行迭代.
+        '''
+    E_i, y_i, alpha = errors[i], y[i], alphas[i]
+    r = E_i * y_i
+
+    # 是否违反KKT条件
+    if (r < -tolerance and alpha < C) or (r > tolerance and alpha > 0):
+        j = select_j(i, N, C, alphas, errors)
+        ''' 对选定的一对alpha对进行优化.
+            '''
+        for i in range(N):
+            errors[i] = get_error(i, gram_K, y, alphas, b)
+
+        a_i, x_i, y_i, E_i = alphas[i], X[i], y[i], errors[i]
+        a_j, x_j, y_j, E_j = alphas[j], X[j], y[j], errors[j]
+
+        K_ii, K_jj, K_ij = np.dot(x_i, x_i), np.dot(x_j, x_j), np.dot(x_i, x_j)
+        eta = K_ii + K_jj - 2 * K_ij
+        if eta <= 0:
+            return 0, b
+
+        a_i_old, a_j_old = a_i, a_j
+        a_j_new = a_j_old + y_j * (E_i - E_j) / eta
+
+        # 对alpha进行修剪
+        if y_i != y_j:
+            L = max(0, a_j_old - a_i_old)
+            H = min(C, C + a_j_old - a_i_old)
+        else:
+            L = max(0, a_i_old + a_j_old - C)
+            H = min(C, a_j_old + a_i_old)
+
+        a_j_new = clip(a_j_new, L, H)
+        a_i_new = a_i_old + y_i * y_j * (a_j_old - a_j_new)
+
+        if abs(a_j_new - a_j_old) < 0.00001:
+            #print('WARNING   alpha_j not moving enough')
+            return 0, b
+
+        alphas[i], alphas[j] = a_i_new, a_j_new
+        for i in range(N):
+            errors[i] = get_error(i, gram_K, y, alphas, b)
+
+        # 更新阈值b
+        b_i = -E_i - y_i * K_ii * (a_i_new - a_i_old) - y_j * K_ij * (
+            a_j_new - a_j_old) + b
+        b_j = -E_j - y_i * K_ij * (a_i_new - a_i_old) - y_j * K_jj * (
+            a_j_new - a_j_old) + b
+
+        if 0 < a_i_new < C:
+            b = b_i
+        elif 0 < a_j_new < C:
+            b = b_j
+        else:
+            b = (b_i + b_j) / 2
+
+        return 1, b
+    else:
+        return 0, b
+
+
 class SVM(object):
 
     def __init__(self,
                  C=1,
-                 max_iter=50,
+                 max_iter=500,
+                 tolerance=0.001,
                  kernel='rbf',
                  degree=3,
                  gamma='scale',
@@ -51,6 +146,7 @@ class SVM(object):
         self.class_num = 0
         self.linear_kernel = kernel == 'linear'
         self.kernel = kernel
+        self.tolerance = tolerance
 
     def append_result(self, alphas, X, y, b):
         self.alphas.append(alphas)
@@ -83,7 +179,8 @@ class SVM(object):
             y = np.where(y <= 0, -1, 1)  # 标签转换为-1和1
             # print(f'start calc {datetime.now()}')
             # numba speed 60.12 => 24.76
-            alphas, X, y, b = self._fit(X, y, gram_K, self.max_iter, self.C)
+            alphas, X, y, b = self._fit(X, y, gram_K, self.max_iter, self.C,
+                                        self.tolerance)
             # print(f'end calc {datetime.now()}')
             self.append_result(alphas, X, y, b)
         else:
@@ -94,8 +191,9 @@ class SVM(object):
             y = np.where(y <= 0, -1, 1)  # 标签转换为-1和1
             for i in range(self.class_num):
                 print(f'start calc {datetime.now()}')
-                alphas, X_, y_, b = self._fit(X, y[:, i], gram_K,
-                                              self.max_iter, self.C)
+                alphas, X_, y_, b = self._fit(X, y[:,
+                                                   i], gram_K, self.max_iter,
+                                              self.C, self.tolerance)
                 print(f'end calc {datetime.now()}')
                 self.append_result(alphas, X_, y_, b)
                 if verbose:
@@ -105,80 +203,40 @@ class SVM(object):
 
     @staticmethod
     @jit(nopython=True)
-    def _fit(X, y, gram_K, max_iter, C):
-        # 初始化参数
-
+    def _fit(X, y, gram_K, max_iter, C, tolerance):
         N, _ = X.shape
+
         alphas = np.zeros(N)
         b = 0
+        # Cached errors ,f(x_i) - y_i
+        errors = [get_error(i, gram_K, y, alphas, b) for i in range(N)]
         it = 0
 
-        # all_alphas, all_bs = [], []
+        # 遍历所有alpha的标记
+        entire = True
 
-        while it < max_iter:
+        pair_changed = 0
+        while (it < max_iter):  #and (pair_changed > 0 or entire):
             pair_changed = 0
-            for i in range(N):
-                a_i, y_i = alphas[i], y[i]
-                gx_i = g(i, gram_K, alphas, y, b)
-                E_i = gx_i - y_i
-                j = i
-                while j == i:
-                    j = int(random.uniform(0, N))
-                a_j, y_j = alphas[j], y[j]
-
-                gx_j = g(j, gram_K, alphas, y, b)
-                E_j = gx_j - y_j
-
-                K_ii, K_jj, K_ij = gram_K[i, i], gram_K[j, j], gram_K[i, j]
-                eta = K_ii + K_jj - 2 * K_ij
-                if eta <= 0:
-                    continue
-
-                # calculate new alpha j
-                a_i_old, a_j_old = a_i, a_j
-                a_j_new = a_j_old + y_j * (E_i - E_j) / eta
-
-                # clip alpha
-                if y_i != y_j:
-                    L = max(0, a_j_old - a_i_old)
-                    H = min(C, C + a_j_old - a_i_old)
-                else:
-                    L = max(0, a_i_old + a_j_old - C)
-                    H = min(C, a_j_old + a_i_old)
-
-                a_j_new = clip(a_j_new, L, H)
-                a_i_new = a_i_old + y_i * y_j * (a_j_old - a_j_new)
-
-                if abs(a_j_new - a_j_old) < 0.00001:
-                    continue
-
-                alphas[i], alphas[j] = a_i_new, a_j_new
-
-                # update threshold b
-                b_i = -E_i - y_i * K_ii * (a_i_new - a_i_old) - y_j * K_ij * (
-                    a_j_new - a_j_old) + b
-                b_j = -E_j - y_i * K_ij * (a_i_new - a_i_old) - y_j * K_jj * (
-                    a_j_new - a_j_old) + b
-
-                if 0 < a_i_new < C:
-                    b = b_i
-                elif 0 < a_j_new < C:
-                    b = b_j
-                else:
-                    b = (b_i + b_j) / 2
-
-                # all_alphas.append(alphas)
-                # all_bs.append(b)
-
-                pair_changed += 1
-                # print('INFO   iteration:{}  i:{}  pair_changed:{}'.format(
-                #     it, i, pair_changed))
-
-            if pair_changed == 0:
-                it += 1
+            if entire:
+                for i in range(N):
+                    pc, b = examine_example(i, alphas, gram_K, errors, X, y,
+                                            tolerance, C, N, b)
+                    pair_changed += pc
             else:
-                it = 0
-            # print('iteration number: {}'.format(it))
+                non_bound_indices = [
+                    i for i in range(N) if alphas[i] > 0 and alphas[i] < C
+                ]
+                for i in non_bound_indices:
+                    pc, b = examine_example(i, alphas, gram_K, errors, X, y,
+                                            tolerance, C, N, b)
+                    pair_changed += pc
+            it += 1
+
+            if entire:
+                entire = False
+            elif pair_changed == 0:
+                entire = True
 
         support_vec_idx = alphas > 1e-3
         alphas = alphas[support_vec_idx]

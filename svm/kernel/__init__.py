@@ -11,7 +11,6 @@ def poly(degree=3, coef0=0, **kwargs):
 
 
 def sigmoid(gamma, coef0=0, **kwargs):
-
     return lambda x, y: np.tanh(gamma * np.dot(x, y) + coef0)
 
 
