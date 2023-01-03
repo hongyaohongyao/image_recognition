@@ -44,7 +44,6 @@ parser.add_argument('--sample-rate',
                     default=0.5,
                     type=float,
                     help='sample train data')
-parser.add_argument('--nc', '--num-c', default=5, type=int, help='number of C')
 parser.add_argument('-k',
                     '--kernel',
                     default="rbf",
