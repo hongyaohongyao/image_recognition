@@ -3,7 +3,6 @@ import kernel as _KERNEL
 import numpy as np
 import random
 
-
 class SVM(object):
 
     def __init__(self, C=1, max_iter=40, kernel='rbf', **kwargs):
@@ -18,6 +17,7 @@ class SVM(object):
         self.linear_kernel = kernel == 'linear'
         self.kernel_args = kwargs
         self.kernel = kernel
+
 
     def fit(self, X, y):
         assert len(self.alphas) == 0, "SVM Model has been fitted"

@@ -13,7 +13,6 @@ from torch.utils import data
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
 from torchvision import datasets
-
 from svm import SVM
 from tqdm import tqdm
 
@@ -117,14 +116,29 @@ def train():
                                   pin_memory=True,
                                   shuffle=False)
     
-    images, labels = train_loader[0]
-    list_c = np.linspace(args.mic, args.mac, args.nc)
-    images = images.numpy().reshape(images.shape[0], -1)
-    labels = labels.numpy()
+    X, y = train_loader[0]
+    X = X.numpy().reshape(X.shape[0], -1)
+    y = y.numpy()
 
-    test_loader[0]
-    for C in tqdm(list_c):
-        model = SVM(kernel=args.kernel, C=args.C)
+    X_test, y_test = test_loader[0]
+    X_test = X_test.numpy().reshape(X_test.shape[0], -1)
+    y_test = y_test.numpy()
+
+    list_c = np.linspace(args.mic, args.mac, args.nc)
+    for i,c in tqdm(enumerate(list_c),total=args.nc):
+        model = SVM(kernel=args.kernel, C=c)
+        model.fit(X,y)
+        pred = model.predict(X)
+        train_acc = (pred==y).mean()
+        writer.add_scalar('Train/acc', train_acc, i)
+        logger.info('Train/acc %.5f' % (train_acc))
+
+        test_pred = model.predict(X_test)
+        test_acc = (test_pred == y_test).mean()
+        writer.add_scalar('Test/acc', test_acc, i)
+        logger.info('Test/acc %.5f' % (test_acc))
+
+
 
 
 
