@@ -1,8 +1,6 @@
 import numpy as np
 import random
 from datetime import datetime
-from tqdm import tqdm
-import numba
 from numba import jit
 
 
@@ -18,7 +16,7 @@ def clip(alpha, L, H):
 
 @jit(nopython=True)
 def g(i, gram_K, alphas, y, b):
-    "SVM分类器函数 y = w^Tx + b"
+    "SVM classifier y = w^Tx + b"
     # Kernel function vector.
     ks = gram_K[:, i]  #N1,N2 -> N1
 
@@ -65,7 +63,7 @@ class SVM(object):
         assert len(self.alphas) == 0, "SVM Model has been fitted"
         X, y = np.array(X, dtype=float), np.array(y, dtype=int)
 
-        self.class_num = np.max(y) + 1  # 最大的类
+        self.class_num = np.max(y) + 1  # number of class
         assert self.class_num >= 2, 'class number should be larger than 2'
         # create kernel
         gamma = self.gamma
@@ -75,12 +73,12 @@ class SVM(object):
             gamma = 1 / X.shape[1]
         self._gamma = gamma
 
-        print(f'kernel start calc {datetime.now()}')
+        # print(f'kernel start calc {datetime.now()}')
         gram_K = self._kernel_matrix(X)  # numba speed 6.46 => 1.54
-        print(f'kernel end calc {datetime.now()}')
+        # print(f'kernel end calc {datetime.now()}')
 
         if self.class_num == 2:
-            y = np.where(y <= 0, -1, 1)  # 标签转换为-1和1
+            y = np.where(y <= 0, -1, 1)  # transform label to -1 and 1
             # print(f'start calc {datetime.now()}')
             # numba speed 60.12 => 24.76
             alphas, X, y, b = self._fit(X, y, gram_K, self.max_iter, self.C)
@@ -91,7 +89,7 @@ class SVM(object):
             multi class
             """
             y = np.eye(self.class_num)[y]
-            y = np.where(y <= 0, -1, 1)  # 标签转换为-1和1
+            y = np.where(y <= 0, -1, 1)  # transform label to -1 and 1
             for i in range(self.class_num):
                 print(f'start calc {datetime.now()}')
                 alphas, X_, y_, b = self._fit(X, y[:, i], gram_K,
@@ -106,15 +104,11 @@ class SVM(object):
     @staticmethod
     @jit(nopython=True)
     def _fit(X, y, gram_K, max_iter, C):
-        # 初始化参数
-
+        # init param
         N, _ = X.shape
         alphas = np.zeros(N)
         b = 0
         it = 0
-
-        # all_alphas, all_bs = [], []
-
         while it < max_iter:
             pair_changed = 0
             for i in range(N):
@@ -133,7 +127,6 @@ class SVM(object):
                 eta = K_ii + K_jj - 2 * K_ij
                 if eta <= 0:
                     continue
-
                 # calculate new alpha j
                 a_i_old, a_j_old = a_i, a_j
                 a_j_new = a_j_old + y_j * (E_i - E_j) / eta
@@ -167,18 +160,12 @@ class SVM(object):
                 else:
                     b = (b_i + b_j) / 2
 
-                # all_alphas.append(alphas)
-                # all_bs.append(b)
-
                 pair_changed += 1
-                # print('INFO   iteration:{}  i:{}  pair_changed:{}'.format(
-                #     it, i, pair_changed))
 
             if pair_changed == 0:
                 it += 1
             else:
                 it = 0
-            # print('iteration number: {}'.format(it))
 
         support_vec_idx = alphas > 1e-3
         alphas = alphas[support_vec_idx]
