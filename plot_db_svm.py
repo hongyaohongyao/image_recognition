@@ -1,6 +1,6 @@
 import numpy as np
 
-from platt_svm import SVM
+from svm import SVM
 import matplotlib.pyplot as plt
 
 
@@ -25,7 +25,7 @@ if __name__ == "__main__":
     X = (X - X.mean()) / X.std()
     y = np.hstack((np.zeros(num_observations), np.ones(num_observations)))
 
-    model = SVM(kernel='linear', C=1, max_iter=500)
+    model = SVM(kernel='linear', C=100, max_iter=500)
     model.fit(X, y)
 
     fig = plt.figure()

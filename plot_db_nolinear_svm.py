@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.datasets import make_moons
-from platt_svm import SVM
+from svm import SVM
 import matplotlib.pyplot as plt
 from sklearn.svm import SVC
 
@@ -29,7 +29,7 @@ if __name__ == "__main__":
     end calc 2023-01-03 15:59:30.063595
     """
 
-    X, y = make_moons(n_samples=1000, noise=0.15, random_state=42)
+    X, y = make_moons(n_samples=100, noise=0.15, random_state=42)
 
     # model = SVM(kernel='poly', C=5, max_iter=500, coef0=1)
     model = SVM(kernel='rbf', C=5, max_iter=40, gamma='scale')
